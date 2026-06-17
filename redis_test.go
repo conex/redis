@@ -1,15 +1,25 @@
+//go:build !tart
+
 package redis_test
 
 import (
+	"fmt"
 	"os"
 	"testing"
+	"time"
 
-	"github.com/conex/redis"
+	"github.com/go-redis/redis"
 	"github.com/omeid/conex"
 )
 
 func TestMain(m *testing.M) {
 	os.Exit(conex.Run(m))
+}
+
+var redisImage = "redis:alpine"
+
+func init() {
+	conex.Require(func() string { return redisImage })
 }
 
 func TestRedis1(t *testing.T) { t.Parallel(); testPing(t) }
@@ -18,11 +28,26 @@ func TestRedis3(t *testing.T) { t.Parallel(); testPing(t) }
 func TestRedis4(t *testing.T) { t.Parallel(); testPing(t) }
 
 func testPing(t *testing.T) {
-
-	db := 0
-
-	r, c := redis.Box(t, db)
+	c := conex.Box(t, &conex.Config{
+		Image:  redisImage,
+		Expose: []string{"6379"},
+	})
 	defer c.Drop()
+
+	// Wait for Redis to be ready
+	t.Logf("Waiting for Redis to accept connections at %s", c.Address())
+	err := c.Wait("6379", 30*time.Second)
+	if err != nil {
+		t.Fatal("Redis failed to start:", err)
+	}
+	t.Log("Redis is now accepting connections")
+
+	addr := fmt.Sprintf("%s:6379", c.Address())
+	client := redis.NewClient(&redis.Options{
+		Addr: addr,
+		DB:   0,
+	})
+	defer func() { _ = client.Close() }()
 
 	cases := []string{
 		"hello",
@@ -30,9 +55,7 @@ func testPing(t *testing.T) {
 	}
 
 	for _, say := range cases {
-
-		reply, err := r.Echo(say).Result()
-
+		reply, err := client.Echo(say).Result()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -40,7 +63,5 @@ func testPing(t *testing.T) {
 		if reply != say {
 			t.Fatalf("\nExpected: %s\nGot:      %s\n", say, reply)
 		}
-
 	}
-
 }

@@ -31,7 +31,7 @@ func Box(t testing.TB, db int) (*redis.Client, conex.Container) {
 		Expose: []string{Port},
 	})
 
-	t.Log("Waiting for Redis to accept connections")
+	conex.Logf(t, "redis", "Waiting for Redis to accept connections")
 
 	err := c.Wait(Port, RedisUpWaitTime)
 	if err != nil {
@@ -39,7 +39,7 @@ func Box(t testing.TB, db int) (*redis.Client, conex.Container) {
 		t.Fatal("Redis failed to start:", err)
 	}
 
-	t.Log("Redis is now accepting connections")
+	conex.Logf(t, "redis", "Redis is now accepting connections")
 
 	addr := fmt.Sprintf("%s:%s", c.Address(), Port)
 	opt := &redis.Options{
